@@ -102,9 +102,15 @@ export default function App() {
     else setQuiz2(prev => ({ ...prev, [qId]: pts }))
   }
 
+  function quizPts(quiz) {
+    return Object.entries(quiz)
+      .filter(([k]) => !k.endsWith('_color'))
+      .reduce((sum, [, v]) => sum + v, 0)
+  }
+
   async function submitVote() {
-    const score1 = 3 + Object.values(quiz1).reduce((a, b) => a + b, 0)
-    const score2 = 1 + Object.values(quiz2).reduce((a, b) => a + b, 0)
+    const score1 = 3 + quizPts(quiz1)
+    const score2 = 1 + quizPts(quiz2)
 
     await fetch(`${base}api/votes`, {
       method: 'POST',
