@@ -58,6 +58,34 @@ function ProgBar({ step }) {
   )
 }
 
+const DEADLINE = new Date('2026-04-28T23:59:00-03:00').getTime()
+
+function Countdown() {
+  const [now, setNow] = useState(Date.now())
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  const diff = DEADLINE - now
+  if (diff <= 0) {
+    return <div className="countdown ended">Votação encerrada</div>
+  }
+
+  const hours   = Math.floor(diff / 3_600_000)
+  const minutes = Math.floor((diff % 3_600_000) / 60_000)
+  const seconds = Math.floor((diff % 60_000) / 1000)
+  const pad = n => String(n).padStart(2, '0')
+
+  return (
+    <div className="countdown">
+      <span className="countdown-label">Votação encerra em</span>
+      <span className="countdown-time">{pad(hours)}:{pad(minutes)}:{pad(seconds)}</span>
+    </div>
+  )
+}
+
 export default function App() {
   const [screen, setScreen] = useState('names')
   const [db, setDb] = useState({ votes: {}, scores: {} })
@@ -147,6 +175,7 @@ export default function App() {
           <h1>Qual conto vira curta?</h1>
           <p className="subtitle">Selecione seu nome para começar a votar. Cada pessoa vota uma única vez.</p>
         </div>
+        <Countdown />
         <div className="names-grid">
           {NAMES.map(name => {
             const used = db.votes?.[name]
