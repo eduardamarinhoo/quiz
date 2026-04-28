@@ -6,6 +6,18 @@ services:
     networks:
       - proxy-network
 
+  quiz:
+    build: ./projetos/quiz
+    container_name: quiz
+    restart: unless-stopped
+    volumes:
+      - quiz_data:/app/data
+    networks:
+      - proxy-network
+
+volumes:
+  quiz_data:
+
 networks:
   proxy-network:
     external: true

@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qual conto vira curta?</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- ============================================================
+  ENQUETE INTERDISCIPLINAR — GRUPO 7 — UNIVALI 2026
+  Arquivo único HTML/CSS/JS — pronto para hospedar ou editar.
+
+  ESTRUTURA:
+  1. <style>   — Design system (cores, tipografia, componentes)
+  2. <body>    — Telas (names, vote1, quiz1, vote2, quiz2, ranking)
+  3. <script>  — Dados, lógica de estado e funções
+
+  PONTO DE ATENÇÃO — BANCO DE DADOS:
+  Atualmente usa window.storage (Claude Artifacts).
+  Para funcionar entre dispositivos diferentes, substituir as
+  funções loadDB() e saveDB() por chamadas a uma API real
+  (ex: Firebase, Supabase, ou backend próprio).
+  Busque por "TODO: BACKEND" nos comentários abaixo.
+============================================================ -->
+
+<style>
+/* ── Design Tokens ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:           #EEF3FA;
+  --surface:      #FFFFFF;
+  --border:       #BAC9E0;
+  --text:         #0E1E35;
+  --muted:        #3D5470;
+  --accent:       #1A4FA0;
+  --accent-light: #D4E2F7;
+  --accent-text:  #0E3070;
+  --orange:       #C25A00;
+  --orange-light: #FDEBD6;
+  --orange-text:  #8F4000;
+  --orange-border:#E8A06A;
+  --green:        #1A6040;
+  --green-light:  #D0EBE0;
+  --amber:        #8A4800;
+  --amber-light:  #FAE2C0;
+  --red:          #8A1F1F;
+  --red-light:    #F5D0D0;
+  --radius:       14px;
+  --radius-sm:    9px;
+}
+
+/* ── Base ───────────────────────────────────────────────────── */
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 2rem 1rem 4rem;
+}
+.container { max-width: 600px; margin: 0 auto; }
+.screen { display: none; }
+.screen.active { display: block; }
+
+/* ── Typography ─────────────────────────────────────────────── */
+.eyebrow {
+  font-size: 12px; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--muted);
+  margin-bottom: 8px; font-weight: 500;
+}
+h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 34px; font-weight: 400;
+  line-height: 1.2; color: var(--text); margin-bottom: 10px;
+}
+.subtitle { font-size: 16px; color: var(--muted); line-height: 1.6; margin-bottom: 2rem; }
+
+/* ── Progress Bar ───────────────────────────────────────────── */
+.progress { display: flex; gap: 6px; margin-bottom: 2rem; }
+.prog-dot { height: 5px; flex: 1; border-radius: 3px; background: var(--border); transition: background 0.3s; }
+.prog-dot.done   { background: var(--accent); }
+.prog-dot.active { background: var(--orange); }
+
+/* ── Page Header (blue card) ────────────────────────────────── */
+.page-header {
+  background: var(--accent);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+.page-header h1       { color: #FFFFFF; }
+.page-header .subtitle{ color: #C8D8F0; margin-bottom: 0; }
+
+/* ── Step Header (light blue card) ─────────────────────────── */
+.step-header {
+  background: var(--accent-light);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.step-header .eyebrow { color: var(--accent); margin-bottom: 4px; }
+.step-header h1       { font-size: 28px; color: var(--text); margin-bottom: 0; }
+.step-header .subtitle{ font-size: 14px; margin-bottom: 0; color: var(--muted); }
+
+/* ── Name Buttons ───────────────────────────────────────────── */
+.names-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px; margin-bottom: 1.5rem;
+}
+.name-btn {
+  background: var(--surface); border: 2px solid var(--border);
+  border-radius: var(--radius-sm); padding: 16px;
+  font-family: 'DM Sans', sans-serif; font-size: 16px; font-weight: 500;
+  color: var(--text); cursor: pointer; text-align: left; transition: all 0.15s;
+}
+.name-btn:hover { border-color: var(--orange); color: var(--orange-text); background: var(--orange-light); }
+.name-btn.used  { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+/* ── Tale Cards ─────────────────────────────────────────────── */
+.tales-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px; margin-bottom: 1.5rem;
+}
+.tale-btn {
+  background: var(--surface); border: 2px solid var(--border);
+  border-radius: var(--radius); padding: 14px 16px;
+  cursor: pointer; text-align: left; transition: all 0.15s;
+}
+.tale-btn:hover:not(.disabled):not(.own) { border-color: var(--accent); background: var(--accent-light); }
+.tale-btn.selected  { border: 2px solid var(--accent); background: var(--accent-light); }
+.tale-btn.disabled  { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+.tale-btn.own       { opacity: 0.3;  cursor: not-allowed; pointer-events: none; }
+.tale-title  { font-size: 14px; font-weight: 500; color: var(--text); line-height: 1.4; }
+.tale-author { font-size: 12px; color: var(--muted); margin-top: 5px; }
+.own-label   { font-size: 11px; color: var(--muted); margin-top: 4px; font-style: italic; }
+
+/* ── Selected Pill ──────────────────────────────────────────── */
+.selected-pill {
+  display: inline-block;
+  background: var(--orange-light); color: var(--orange-text);
+  font-size: 13px; font-weight: 500; padding: 5px 14px;
+  border-radius: 20px; margin-bottom: 1.25rem;
+  border: 1.5px solid var(--orange-border);
+}
+
+/* ── Quiz ───────────────────────────────────────────────────── */
+.quiz-block {
+  background: var(--surface); border: 2px solid var(--border);
+  border-radius: var(--radius); padding: 1.25rem; margin-bottom: 12px;
+}
+.quiz-q { font-size: 15px; font-weight: 500; line-height: 1.55; margin-bottom: 14px; color: var(--text); }
+.quiz-opts { display: flex; flex-direction: column; gap: 8px; }
+.quiz-opt {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 11px 14px; border: 2px solid var(--border);
+  border-radius: var(--radius-sm); cursor: pointer;
+  transition: all 0.12s; background: var(--bg);
+}
+.quiz-opt:hover         { border-color: #7A9CC8; background: #E2ECF8; }
+.quiz-opt.sel-green     { border: 2px solid var(--green); background: var(--green-light); }
+.quiz-opt.sel-amber     { border: 2px solid var(--amber); background: var(--amber-light); }
+.quiz-opt.sel-red       { border: 2px solid var(--red);   background: var(--red-light);   }
+.opt-circle {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--border); flex-shrink: 0;
+  margin-top: 2px; transition: all 0.12s;
+}
+.opt-circle.green { background: var(--green); border-color: var(--green); }
+.opt-circle.amber { background: var(--amber); border-color: var(--amber); }
+.opt-circle.red   { background: var(--red);   border-color: var(--red);   }
+.opt-label { font-size: 14px; line-height: 1.45; color: var(--text); }
+
+/* ── Buttons ────────────────────────────────────────────────── */
+.btn-primary {
+  width: 100%; padding: 15px;
+  background: var(--orange); color: #FFFFFF;
+  border: none; border-radius: var(--radius-sm);
+  font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 500;
+  cursor: pointer; margin-bottom: 10px; transition: opacity 0.15s;
+}
+.btn-primary:hover    { opacity: 0.88; }
+.btn-primary:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.btn-back {
+  width: 100%; padding: 14px;
+  background: transparent; color: var(--muted);
+  border: 2px solid var(--border); border-radius: var(--radius-sm);
+  font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 500;
+  cursor: pointer; transition: all 0.15s;
+}
+.btn-back:hover { color: var(--accent-text); border-color: var(--accent); background: var(--accent-light); }
+
+.btn-secondary {
+  width: 100%; padding: 14px;
+  background: var(--accent-light); color: var(--accent-text);
+  border: 2px solid var(--accent); border-radius: var(--radius-sm);
+  font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 500;
+  cursor: pointer; transition: all 0.15s; margin-bottom: 10px;
+}
+.btn-secondary:hover { background: var(--accent); color: #FFFFFF; }
+
+/* ── Ranking ────────────────────────────────────────────────── */
+.section-label {
+  font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 10px; font-weight: 500;
+}
+.rank-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 1rem; }
+.rank-item {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--surface); border: 2px solid var(--border);
+  border-radius: var(--radius); padding: 14px 16px;
+}
+.rank-item.top  { border-color: var(--orange); background: var(--orange-light); }
+.rank-pos       { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--muted); min-width: 30px; }
+.rank-pos.gold  { color: var(--orange); }
+.rank-info      { flex: 1; }
+.rank-title     { font-size: 15px; font-weight: 500; color: var(--text); }
+.rank-author    { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.rank-score     { font-family: 'DM Serif Display', serif; font-size: 28px; color: var(--accent); }
+.rank-votes     { font-size: 12px; color: var(--muted); text-align: right; }
+.score-note     { font-size: 12px; color: var(--muted); line-height: 1.7; margin-bottom: 1.5rem; }
+.btn-reset      { background: none; border: none; font-size: 11px; color: #A0B4CC; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ── TELA 1: Seleção de nome ──────────────────────────── -->
+  <div id="screen-names" class="screen active">
+    <div class="eyebrow">votação · enquete interdisciplinar</div>
+    <div class="page-header">
+      <h1>Qual conto vira curta?</h1>
+      <p class="subtitle">Selecione seu nome para começar a votar. Cada pessoa vota uma única vez.</p>
+    </div>
+    <div class="names-grid" id="names-grid"></div>
+    <button class="btn-secondary" onclick="showRanking()">Ver ranking atual →</button>
+  </div>
+
+  <!-- ── TELA 2: 1ª escolha ───────────────────────────────── -->
+  <div id="screen-vote1" class="screen">
+    <div class="progress" id="prog1"></div>
+    <div class="step-header">
+      <div class="eyebrow">1ª escolha</div>
+      <h1>Qual conto você escolheria?</h1>
+      <p class="subtitle">Este voto tem peso maior. Seu próprio conto está desabilitado.</p>
+    </div>
+    <div class="tales-grid" id="tales-grid-1"></div>
+    <button class="btn-primary" id="btn-v1" disabled onclick="goToQuiz(1)">Confirmar 1ª escolha →</button>
+    <button class="btn-back" onclick="goBack('vote1')">← Voltar</button>
+  </div>
+
+  <!-- ── TELA 3: Quiz da 1ª escolha ───────────────────────── -->
+  <div id="screen-quiz1" class="screen">
+    <div class="progress" id="prog2"></div>
+    <div class="step-header">
+      <div class="eyebrow">quiz · 1ª escolha</div>
+      <h1>Avalie o conto</h1>
+    </div>
+    <div class="selected-pill" id="quiz1-tag"></div>
+    <div id="quiz1-qs"></div>
+    <button class="btn-primary" id="btn-q1" disabled onclick="goToVote2()">Confirmar e ir para 2ª escolha →</button>
+    <button class="btn-back" onclick="goBack('quiz1')">← Voltar</button>
+  </div>
+
+  <!-- ── TELA 4: 2ª escolha ───────────────────────────────── -->
+  <div id="screen-vote2" class="screen">
+    <div class="progress" id="prog3"></div>
+    <div class="step-header">
+      <div class="eyebrow">2ª escolha</div>
+      <h1>Qual seria sua 2ª opção?</h1>
+      <p class="subtitle">Este voto tem peso menor, mas conta como critério de desempate.</p>
+    </div>
+    <div class="tales-grid" id="tales-grid-2"></div>
+    <button class="btn-primary" id="btn-v2" disabled onclick="goToQuiz(2)">Confirmar 2ª escolha →</button>
+    <button class="btn-back" onclick="goBack('vote2')">← Voltar</button>
+  </div>
+
+  <!-- ── TELA 5: Quiz da 2ª escolha ───────────────────────── -->
+  <div id="screen-quiz2" class="screen">
+    <div class="progress" id="prog4"></div>
+    <div class="step-header">
+      <div class="eyebrow">quiz · 2ª escolha</div>
+      <h1>Avalie o conto</h1>
+    </div>
+    <div class="selected-pill" id="quiz2-tag"></div>
+    <div id="quiz2-qs"></div>
+    <button class="btn-primary" id="btn-q2" disabled onclick="submitVote()">Finalizar votação →</button>
+    <button class="btn-back" onclick="goBack('quiz2')">← Voltar</button>
+  </div>
+
+  <!-- ── TELA 6: Ranking ──────────────────────────────────── -->
+  <div id="screen-ranking" class="screen">
+    <div class="eyebrow">resultado parcial</div>
+    <div class="page-header">
+      <h1>Ranking atual</h1>
+      <p class="subtitle" id="votes-count"></p>
+    </div>
+    <div class="section-label">pontuação</div>
+    <div class="rank-list" id="rank-list"></div>
+    <p class="score-note">
+      1ª escolha: até 12 pts (3 base + até 9 do quiz) ·
+      2ª escolha: até 6 pts (1 base + até 5 do quiz)
+    </p>
+    <button class="btn-back" onclick="goBack('ranking')">← Voltar para votação</button>
+    <div style="margin-top:2rem;text-align:center;">
+      <button class="btn-reset" onclick="tryReset()">resetar votos</button>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+// ── Dados ──────────────────────────────────────────────────────
+const TALES = [
+  { id: 'emanuel',      title: 'Um erro que não aparece em exames', author: 'Emanuel'      },
+  { id: 'gabriel',      title: 'Chá de amor',                       author: 'Gabriel'      },
+  { id: 'marcos',       title: 'Depois do dia',                     author: 'Marcos'       },
+  { id: 'matheus',      title: 'Infusão',                           author: 'Matheus'      },
+  { id: 'gabriela',     title: 'O Chá da Memória',                  author: 'Gabriela'     },
+  { id: 'gustavo',      title: 'O Jogo dos Condenados',             author: 'Gustavo'      },
+  { id: 'mariaeduarda', title: 'Sabor da Montanha',                 author: 'Maria Eduarda'},
+];
+
+// Mapeia nome → id do conto de cada autor (para bloquear auto-voto)
+const NAME_TO_TALE = {
+  'Emanuel':      'emanuel',
+  'Gabriel':      'gabriel',
+  'Marcos':       'marcos',
+  'Matheus':      'matheus',
+  'Gabriela':     'gabriela',
+  'Gustavo':      'gustavo',
+  'Maria Eduarda':'mariaeduarda',
+};
+
+const NAMES = ['Gabriela','Gabriel','Gustavo','Matheus','Marcos','Maria Eduarda','Emanuel'];
+
+const QUESTIONS = [
+  {
+    id: 'q1',
+    text: 'O conto tem ambientação brasileira ou catarinense bem desenvolvida?',
+    opts: [
+      { label: 'Sim, é central na história',                       color: 'green', pts: 3 },
+      { label: 'Está presente, mas poderia ser mais desenvolvida', color: 'amber', pts: 1 },
+      { label: 'Não tem ou é muito superficial',                   color: 'red',   pts: 0 },
+    ],
+  },
+  {
+    id: 'q2',
+    text: 'O conflito, clímax e desfecho estão claros o suficiente para virar um curta?',
+    opts: [
+      { label: 'Sim, a estrutura está bem definida',   color: 'green', pts: 3 },
+      { label: 'Dá para adaptar com alguns ajustes',   color: 'amber', pts: 1 },
+      { label: 'A estrutura é confusa ou incompleta',  color: 'red',   pts: 0 },
+    ],
+  },
+  {
+    id: 'q3',
+    text: 'Você consegue enxergar esse conto sendo gravado com os recursos que o grupo tem?',
+    opts: [
+      { label: 'Sim, é viável e tem potencial visual forte',  color: 'green', pts: 3 },
+      { label: 'É viável, mas exigiria bastante esforço',     color: 'amber', pts: 1 },
+      { label: 'Seria muito difícil ou inviável de gravar',   color: 'red',   pts: 0 },
+    ],
+  },
+];
+
+// ── Estado local ───────────────────────────────────────────────
+let state = { user: null, vote1: null, vote2: null, quiz1: {}, quiz2: {} };
+
+// ── Banco de dados (SQLite via API Flask) ──────────────────────
+let db = { votes: {}, scores: {} };
+
+async function loadDB() {
+  try {
+    const res = await fetch('/api/votes');
+    db = await res.json();
+  } catch(e) {
+    db = { votes: {}, scores: {} };
+  }
+}
+
+// ── Utilitários de UI ──────────────────────────────────────────
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+function prog(elId, step) {
+  document.getElementById(elId).innerHTML = [1, 2, 3, 4].map(i =>
+    `<div class="prog-dot ${i < step ? 'done' : i === step ? 'active' : ''}"></div>`
+  ).join('');
+}
+
+// ── Tela: Nomes ────────────────────────────────────────────────
+function renderNames() {
+  document.getElementById('names-grid').innerHTML = NAMES.map(n => {
+    const used = db.votes && db.votes[n];
+    return `<button class="name-btn${used ? ' used' : ''}" onclick="selectName('${n}')">
+      ${n}${used ? ' ✓' : ''}
+    </button>`;
+  }).join('');
+}
+
+function selectName(name) {
+  state = { user: name, vote1: null, vote2: null, quiz1: {}, quiz2: {} };
+  prog('prog1', 1);
+  renderTales('tales-grid-1', null);
+  document.getElementById('btn-v1').disabled = true;
+  show('vote1');
+}
+
+// ── Tela: Escolha de conto ─────────────────────────────────────
+function renderTales(elId, exclude) {
+  const own = NAME_TO_TALE[state.user];
+  const cur = elId === 'tales-grid-1' ? state.vote1 : state.vote2;
+  document.getElementById(elId).innerHTML = TALES.map(t => {
+    const isOwn  = t.id === own;
+    const isExcl = t.id === exclude;
+    const isSel  = cur && cur.id === t.id;
+    const cls    = isOwn ? 'own' : isExcl ? 'disabled' : isSel ? 'selected' : '';
+    return `<div class="tale-btn ${cls}" onclick="pickTale('${elId}','${t.id}')">
+      <div class="tale-title">${t.title}</div>
+      <div class="tale-author">${t.author}</div>
+      ${isOwn ? '<div class="own-label">seu conto</div>' : ''}
+    </div>`;
+  }).join('');
+}
+
+function pickTale(elId, id) {
+  if (id === NAME_TO_TALE[state.user]) return; // bloqueia auto-voto
+  const tale = TALES.find(t => t.id === id);
+  if (elId === 'tales-grid-1') {
+    state.vote1 = tale;
+    document.getElementById('btn-v1').disabled = false;
+  } else {
+    state.vote2 = tale;
+    document.getElementById('btn-v2').disabled = false;
+  }
+  renderTales(elId, elId === 'tales-grid-1' ? null : state.vote1.id);
+}
+
+// ── Tela: Quiz ─────────────────────────────────────────────────
+function goToQuiz(round) {
+  if (round === 1) {
+    prog('prog2', 2);
+    document.getElementById('quiz1-tag').textContent = state.vote1.title;
+    renderQuiz('quiz1-qs', 1);
+    document.getElementById('btn-q1').disabled = true;
+    show('quiz1');
+  } else {
+    prog('prog4', 4);
+    document.getElementById('quiz2-tag').textContent = state.vote2.title;
+    renderQuiz('quiz2-qs', 2);
+    document.getElementById('btn-q2').disabled = true;
+    show('quiz2');
+  }
+}
+
+function renderQuiz(elId, round) {
+  const ans = round === 1 ? state.quiz1 : state.quiz2;
+  document.getElementById(elId).innerHTML = QUESTIONS.map(q => `
+    <div class="quiz-block">
+      <div class="quiz-q">${q.text}</div>
+      <div class="quiz-opts">
+        ${q.opts.map((o, i) => {
+          const prev  = ans[q.id];
+          const isSel = prev !== undefined &&
+                        q.opts.findIndex(x => x.pts === prev && x.color === o.color) === i;
+          return `<div class="quiz-opt${isSel ? ' sel-' + o.color : ''}"
+                       id="${elId}-${q.id}-${i}"
+                       onclick="pickOpt('${elId}','${q.id}',${i},${o.pts},'${o.color}',${round})">
+            <div class="opt-circle${isSel ? ' ' + o.color : ''}"
+                 id="dot-${elId}-${q.id}-${i}"></div>
+            <div class="opt-label">${o.label}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`
+  ).join('');
+}
+
+function pickOpt(elId, qId, idx, pts, color, round) {
+  const ans = round === 1 ? state.quiz1 : state.quiz2;
+  ans[qId] = pts;
+  QUESTIONS.find(q => q.id === qId).opts.forEach((o, i) => {
+    document.getElementById(`${elId}-${qId}-${i}`).className =
+      'quiz-opt' + (i === idx ? ' sel-' + color : '');
+    document.getElementById(`dot-${elId}-${qId}-${i}`).className =
+      'opt-circle' + (i === idx ? ' ' + color : '');
+  });
+  const allDone = QUESTIONS.every(q => ans[q.id] !== undefined);
+  document.getElementById(round === 1 ? 'btn-q1' : 'btn-q2').disabled = !allDone;
+}
+
+// ── Navegação ──────────────────────────────────────────────────
+function goToVote2() {
+  state.vote2 = null;
+  state.quiz2 = {};
+  prog('prog3', 3);
+  renderTales('tales-grid-2', state.vote1.id);
+  document.getElementById('btn-v2').disabled = true;
+  show('vote2');
+}
+
+function goBack(from) {
+  switch (from) {
+    case 'vote1':
+      renderNames(); show('names'); break;
+    case 'quiz1':
+      renderTales('tales-grid-1', null);
+      document.getElementById('btn-v1').disabled = !state.vote1;
+      show('vote1'); break;
+    case 'vote2':
+      document.getElementById('quiz1-tag').textContent = state.vote1.title;
+      renderQuiz('quiz1-qs', 1);
+      show('quiz1'); break;
+    case 'quiz2':
+      renderTales('tales-grid-2', state.vote1.id);
+      document.getElementById('btn-v2').disabled = !state.vote2;
+      show('vote2'); break;
+    case 'ranking':
+      renderNames(); show('names'); break;
+  }
+}
+
+// ── Submissão do voto ──────────────────────────────────────────
+async function submitVote() {
+  const score1 = 3 + Object.values(state.quiz1).reduce((a, b) => a + b, 0); // max 12
+  const score2 = 1 + Object.values(state.quiz2).reduce((a, b) => a + b, 0); // max 6
+
+  await fetch('/api/votes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      voter:  state.user,
+      vote1:  state.vote1.id,
+      vote2:  state.vote2.id,
+      score1,
+      score2,
+    }),
+  });
+
+  await loadDB();
+  showRanking();
+}
+
+// ── Ranking ────────────────────────────────────────────────────
+function showRanking() {
+  const total = db.votes ? Object.keys(db.votes).length : 0;
+  document.getElementById('votes-count').textContent =
+    `${total} de ${NAMES.length} pessoas já votaram.`;
+
+  const ranked = TALES.map(t => ({
+    ...t,
+    score:  (db.scores && db.scores[t.id]) || 0,
+    voters: db.votes
+      ? Object.values(db.votes).filter(v => v.vote1 === t.id || v.vote2 === t.id).length
+      : 0,
+  })).sort((a, b) => b.score - a.score);
+
+  const pos = ['1º','2º','3º','4º','5º','6º','7º'];
+  document.getElementById('rank-list').innerHTML = ranked.map((t, i) => `
+    <div class="rank-item${i === 0 ? ' top' : ''}">
+      <div class="rank-pos${i === 0 ? ' gold' : ''}">${pos[i]}</div>
+      <div class="rank-info">
+        <div class="rank-title">${t.title}</div>
+        <div class="rank-author">${t.author}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="rank-score">${t.score}</div>
+        <div class="rank-votes">${t.voters} voto${t.voters !== 1 ? 's' : ''}</div>
+      </div>
+    </div>`
+  ).join('');
+
+  show('ranking');
+}
+
+// ── Reset (protegido por senha) ────────────────────────────────
+async function tryReset() {
+  const senha = prompt('Senha de reset:');
+  if (senha === 'resetar2026') {
+    if (confirm('Tem certeza? Todos os votos serão apagados.')) {
+      await fetch('/api/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senha }),
+      });
+      db = { votes: {}, scores: {} };
+      renderNames();
+      show('names');
+      alert('Votos apagados com sucesso!');
+    }
+  } else {
+    alert('Senha incorreta.');
+  }
+}
+
+// ── Init ───────────────────────────────────────────────────────
+async function init() {
+  await loadDB();
+  renderNames();
+}
+init();
+</script>
+</body>
+</html>
