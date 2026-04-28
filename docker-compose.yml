@@ -1,0 +1,11 @@
+services:
+  eduardamarinho-app:
+    build: .
+    container_name: eduardamarinho-app
+    restart: unless-stopped
+    networks:
+      - proxy-network
+
+networks:
+  proxy-network:
+    external: true
